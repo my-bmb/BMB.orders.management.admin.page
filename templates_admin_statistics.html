@@ -1,0 +1,507 @@
+<!-- templates/admin_statistics.html -->
+{% extends "base_admin.html" %}
+
+{% block title %}Statistics & Analytics - Bite Me Buddy Admin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Statistics & Analytics</h2>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-left"></i> Dashboard
+                </a>
+                <a href="{{ url_for('admin_orders') }}" class="btn btn-primary">
+                    <i class="bi bi-receipt"></i> View Orders
+                </a>
+            </div>
+        </div>
+        <p class="text-muted mb-0">Detailed analytics and performance metrics</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('admin_statistics') }}" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Chart Type</label>
+                <select name="chart" class="form-select" onchange="this.form.submit()">
+                    <option value="revenue" {% if chart_type == 'revenue' %}selected{% endif %}>Revenue Analytics</option>
+                    <option value="customers" {% if chart_type == 'customers' %}selected{% endif %}>Customer Analytics</option>
+                    <option value="items" {% if chart_type == 'items' %}selected{% endif %}>Item Analytics</option>
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label">From Date</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label">To Date</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            
+            <div class="col-12">
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-filter"></i> Apply Filters
+                    </button>
+                    
+                    <div class="btn-group">
+                        <a href="{{ url_for('admin_statistics', chart='revenue') }}" 
+                           class="btn btn-outline-primary {% if chart_type == 'revenue' %}active{% endif %}">
+                            Revenue
+                        </a>
+                        <a href="{{ url_for('admin_statistics', chart='customers') }}" 
+                           class="btn btn-outline-primary {% if chart_type == 'customers' %}active{% endif %}">
+                            Customers
+                        </a>
+                        <a href="{{ url_for('admin_statistics', chart='items') }}" 
+                           class="btn btn-outline-primary {% if chart_type == 'items' %}active{% endif %}">
+                            Items
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if chart_type == 'revenue' %}
+<!-- Revenue Statistics -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-graph-up me-2"></i>
+                Revenue Trend
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-pie-chart me-2"></i>
+                Payment Methods
+            </div>
+            <div class="card-body">
+                <canvas id="paymentChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-table me-2"></i>
+                Revenue Data
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Orders</th>
+                                <th>Revenue</th>
+                                <th>Avg. Order Value</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for day in revenue_data %}
+                            <tr>
+                                <td>{{ day.order_day.strftime('%d %b %Y') }}</td>
+                                <td class="fw-bold">{{ day.order_count }}</td>
+                                <td class="fw-bold">{{ format_currency(day.daily_revenue) }}</td>
+                                <td>{{ format_currency(day.avg_order_value) }}</td>
+                                <td>
+                                    {% if loop.index > 1 %}
+                                        {% set prev = revenue_data[loop.index-2] %}
+                                        {% set change = ((day.daily_revenue - prev.daily_revenue) / prev.daily_revenue * 100) if prev.daily_revenue > 0 else 0 %}
+                                        <span class="badge {% if change > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                            {{ change|round(1) }}%
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% elif chart_type == 'customers' %}
+<!-- Customer Statistics -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-people me-2"></i>
+                Top Customers by Revenue
+            </div>
+            <div class="card-body">
+                <canvas id="customersChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-bar-chart me-2"></i>
+                Customer Order Distribution
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Orders</th>
+                                <th>Total Spent</th>
+                                <th>Avg. Order</th>
+                                <th>Last Order</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for customer in top_customers %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ customer.user_name }}</div>
+                                    <small class="text-muted">{{ customer.user_email }}</small>
+                                </td>
+                                <td class="fw-bold">{{ customer.order_count }}</td>
+                                <td class="fw-bold">{{ format_currency(customer.total_spent) }}</td>
+                                <td>{{ format_currency(customer.avg_order_value) }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="loadCustomerDetails({{ customer.user_id }})">
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% elif chart_type == 'items' %}
+<!-- Item Statistics -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-bar-chart me-2"></i>
+                Top Items by Quantity
+            </div>
+            <div class="card-body">
+                <canvas id="itemsChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-currency-rupee me-2"></i>
+                Top Items by Revenue
+            </div>
+            <div class="card-body">
+                <canvas id="revenueItemsChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-table me-2"></i>
+                Item Performance Details
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Type</th>
+                                <th>Quantity</th>
+                                <th>Revenue</th>
+                                <th>Orders</th>
+                                <th>Avg. per Order</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in top_items %}
+                            <tr>
+                                <td class="fw-bold">{{ item.item_name }}</td>
+                                <td>
+                                    <span class="badge {% if item.item_type == 'service' %}bg-info{% else %}bg-success{% endif %}">
+                                        {{ item.item_type|title }}
+                                    </span>
+                                </td>
+                                <td class="fw-bold">{{ item.total_quantity }}</td>
+                                <td class="fw-bold">{{ format_currency(item.total_revenue) }}</td>
+                                <td>{{ item.order_count }}</td>
+                                <td>{{ format_currency(item.total_revenue / item.order_count if item.order_count > 0 else 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Summary Cards -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center py-3">
+                <div class="fs-4 fw-bold text-primary">
+                    {{ revenue_data|sum(attribute='order_count') if revenue_data else 0 }}
+                </div>
+                <div class="text-muted">Total Orders</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center py-3">
+                <div class="fs-4 fw-bold text-success">
+                    {{ format_currency(revenue_data|sum(attribute='daily_revenue') if revenue_data else 0) }}
+                </div>
+                <div class="text-muted">Total Revenue</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center py-3">
+                <div class="fs-4 fw-bold text-warning">
+                    {{ top_customers|length if top_customers else 0 }}
+                </div>
+                <div class="text-muted">Active Customers</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center py-3">
+                <div class="fs-4 fw-bold text-info">
+                    {{ top_items|sum(attribute='total_quantity') if top_items else 0 }}
+                </div>
+                <div class="text-muted">Items Sold</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if chart_type == 'revenue' %}
+        // Revenue Chart
+        const revenueCtx = document.getElementById('revenueChart');
+        if (revenueCtx) {
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ revenue_labels|tojson }},
+                    datasets: [{
+                        label: 'Revenue (₹)',
+                        data: {{ revenue_values|tojson }},
+                        borderColor: '#4361ee',
+                        backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₹' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Payment Methods Chart
+        const paymentCtx = document.getElementById('paymentChart');
+        if (paymentCtx) {
+            new Chart(paymentCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ payment_labels|tojson }},
+                    datasets: [{
+                        data: {{ payment_amounts|tojson }},
+                        backgroundColor: [
+                            '#4361ee',
+                            '#3a0ca3',
+                            '#7209b7',
+                            '#f72585',
+                            '#4cc9f0'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ₹${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        {% elif chart_type == 'customers' %}
+        // Customers Chart
+        const customersCtx = document.getElementById('customersChart');
+        if (customersCtx) {
+            new Chart(customersCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ customer_names|tojson }},
+                    datasets: [{
+                        label: 'Total Spent (₹)',
+                        data: {{ customer_spent|tojson }},
+                        backgroundColor: '#4361ee'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₹' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        {% elif chart_type == 'items' %}
+        // Items Quantity Chart
+        const itemsCtx = document.getElementById('itemsChart');
+        if (itemsCtx) {
+            new Chart(itemsCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ item_names|tojson }},
+                    datasets: [{
+                        label: 'Quantity Sold',
+                        data: {{ item_quantities|tojson }},
+                        backgroundColor: '#4361ee'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Items Revenue Chart
+        const revenueItemsCtx = document.getElementById('revenueItemsChart');
+        if (revenueItemsCtx) {
+            new Chart(revenueItemsCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ item_names|tojson }},
+                    datasets: [{
+                        label: 'Revenue (₹)',
+                        data: {{ item_revenue|tojson }},
+                        backgroundColor: '#4cc9f0'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₹' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        {% endif %}
+    });
+</script>
+{% endblock %}
